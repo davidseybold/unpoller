@@ -58,6 +58,9 @@ type Config struct {
 	// BatchSize controls the async batch size for v2 influxdb client mode
 	BatchSize uint `json:"batch_size,omitempty" toml:"batch_size,omitempty" xml:"batch_size" yaml:"batch_size"`
 
+	// NoSync disables sync mode for v3 influxdb
+	NoSync bool `json:"no_sync" toml:"no_sync" xml:"no_sync" yaml:"no_sync"`
+
 	// URL details which influxdb url to use to report metrics to.
 	URL string `json:"url,omitempty" toml:"url,omitempty" xml:"url" yaml:"url"`
 	// Disable when true will disable the influxdb output.
@@ -191,8 +194,13 @@ func (u *InfluxUnifi) DebugOutput() (bool, error) {
 	case 3:
 		tlsConfig := &tls.Config{InsecureSkipVerify: !u.VerifySSL} // nolint: gosec
 		u.InfluxV3Client, err = influxV3.New(influxV3.ClientConfig{
-			Host:  u.URL,
-			Token: u.AuthToken,
+			Host:         u.URL,
+			Token:        u.AuthToken,
+			Organization: u.Org,
+			WriteOptions: &influxV3.WriteOptions{
+				Database: u.DB,
+				NoSync:   u.NoSync,
+			},
 			HTTPClient: &http.Client{
 				Timeout: time.Second * 2,
 				Transport: &http.Transport{
@@ -261,8 +269,13 @@ func (u *InfluxUnifi) Run(c poller.Collect) error {
 	case 3:
 		tlsConfig := &tls.Config{InsecureSkipVerify: !u.VerifySSL} // nolint: gosec
 		u.InfluxV3Client, err = influxV3.New(influxV3.ClientConfig{
-			Host:  u.URL,
-			Token: u.AuthToken,
+			Host:         u.URL,
+			Token:        u.AuthToken,
+			Organization: u.Org,
+			WriteOptions: &influxV3.WriteOptions{
+				Database: u.DB,
+				NoSync:   u.NoSync,
+			},
 			HTTPClient: &http.Client{
 				Transport: &http.Transport{
 					TLSClientConfig: tlsConfig,
@@ -369,7 +382,7 @@ func (u *InfluxUnifi) ReportMetrics(m *poller.Metrics, e *poller.Events) (*Repor
 		ch:      make(chan *metric),
 		Start:   time.Now(),
 		Counts:  &Counts{Val: make(map[item]int)},
-		batch:   make([]any, 0),
+		batch:   make([]*influxV3.Point, 0),
 	}
 	defer close(r.ch)
 
@@ -391,9 +404,9 @@ func (u *InfluxUnifi) ReportMetrics(m *poller.Metrics, e *poller.Events) (*Repor
 		u.loopPoints(r)
 		r.wg.Wait() // wait for all points to finish batching!
 
-		err := u.InfluxV3Client.WriteData(context.Background(), r.batch, influxV3.WithDatabase(u.DB))
+		err := u.InfluxV3Client.WritePoints(context.Background(), r.batch)
 		if err != nil {
-			return nil, fmt.Errorf("influxdb.WriteData: %w", err)
+			return nil, fmt.Errorf("influxdb.WritePoints: %w", err)
 		}
 
 	default:

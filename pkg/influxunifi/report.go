@@ -25,7 +25,7 @@ type Report struct {
 	wg      sync.WaitGroup
 	bp      influxV1.BatchPoints
 	writer  influxV2API.WriteAPI
-	batch   []any
+	batch   []*influxV3.Point
 }
 
 // Counts holds counters and has a lock to deal with routines.
