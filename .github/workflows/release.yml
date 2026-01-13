@@ -21,7 +21,7 @@ jobs:
 
       - name: Build Binary
         run: |
-          GOOS=linux GOARCH=amd64 go build -o unpoller-linux-amd64 cmd/main.go
+          GOOS=linux GOARCH=amd64 go build -o unpoller-linux-amd64 main.go
 
       - name: Create Release and Upload
         uses: softprops/action-gh-release@v2
