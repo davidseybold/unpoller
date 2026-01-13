@@ -172,13 +172,13 @@ func TestInfluxV1Integration(t *testing.T) {
 
 	u := influxunifi.InfluxUnifi{
 		Collector:      testRig.Collector,
-		IsVersion2:     false,
 		InfluxV1Client: mockCapture,
 		InfluxDB: &influxunifi.InfluxDB{
 			Config: &influxunifi.Config{
 				DB:       "unpoller",
 				URL:      testRig.MockServer.Server.URL,
 				Interval: cnfg.Duration{Duration: time.Hour},
+				Version:  1,
 			},
 		},
 	}

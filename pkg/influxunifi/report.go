@@ -5,15 +5,16 @@ import (
 	"sync"
 	"time"
 
+	influxV3 "github.com/InfluxCommunity/influxdb3-go/v2/influxdb3"
 	influxV2API "github.com/influxdata/influxdb-client-go/v2/api"
 	influxV2Write "github.com/influxdata/influxdb-client-go/v2/api/write"
 	influxV1 "github.com/influxdata/influxdb1-client/v2"
+
 	"github.com/unpoller/unpoller/pkg/poller"
 )
 
 // Report is returned to the calling procedure after everything is processed.
 type Report struct {
-	UseV2   bool
 	Metrics *poller.Metrics
 	Events  *poller.Events
 	Errors  []error
@@ -24,6 +25,7 @@ type Report struct {
 	wg      sync.WaitGroup
 	bp      influxV1.BatchPoints
 	writer  influxV2API.WriteAPI
+	batch   []any
 }
 
 // Counts holds counters and has a lock to deal with routines.
@@ -40,6 +42,7 @@ type report interface {
 	error(err error)
 	batchV1(m *metric, pt *influxV1.Point)
 	batchV2(m *metric, pt *influxV2Write.Point)
+	batchV3(m *metric, pt *influxV3.Point)
 	metrics() *poller.Metrics
 	events() *poller.Events
 	addCount(item, ...int)
@@ -129,6 +132,16 @@ func (r *Report) batchV2(m *metric, p *influxV2Write.Point) {
 	r.addCount(fieldT, len(m.Fields))
 	r.addCount(bytesT, calculateMetricBytes(m))
 	r.writer.WritePoint(p)
+}
+
+func (r *Report) batchV3(m *metric, p *influxV3.Point) {
+	if p == nil {
+		return
+	}
+	r.addCount(pointT)
+	r.addCount(fieldT, len(m.Fields))
+	r.addCount(bytesT, calculateMetricBytes(m))
+	r.batch = append(r.batch, p)
 }
 
 func (r *Report) String() string {
